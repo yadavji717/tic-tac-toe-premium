@@ -1,0 +1,672 @@
+import { useState, useEffect, useCallback } from 'react';
+import { X, Circle, Bot, RefreshCcw } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+
+// `react-responsive` ko hata diya gaya hai taaki koi compilation error na ho
+// iske badle custom hook ka upyog kiya gaya hai
+const useIsMobile = () => {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkIsMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+
+    checkIsMobile();
+    window.addEventListener('resize', checkIsMobile);
+
+    return () => {
+      window.removeEventListener('resize', checkIsMobile);
+    };
+  }, []);
+
+  return isMobile;
+};
+
+// --- Minimax Algorithm for Hard Difficulty ---
+// Yeh function diye gaye board state mein winner ko check karta hai
+const checkMinimaxWinner = (board) => {
+  const winningCombinations = [
+    [0, 1, 2], [3, 4, 5], [6, 7, 8],
+    [0, 3, 6], [1, 4, 7], [2, 5, 8],
+    [0, 4, 8], [2, 4, 6]
+  ];
+
+  for (const combo of winningCombinations) {
+    const [a, b, c] = combo;
+    if (board[a] && board[a] === board[b] && board[a] === board[c]) {
+      return board[a];
+    }
+  }
+  if (board.every(cell => cell !== null)) {
+    return 'Draw';
+  }
+  return null;
+};
+
+// Minimax function jo sabse acchi possible move dhundhta hai
+const minimax = (newBoard, player) => {
+  const humanPlayer = 'X';
+  const aiPlayer = 'O';
+  const emptyCells = newBoard.map((cell, index) => cell === null ? index : null).filter(val => val !== null);
+  const winner = checkMinimaxWinner(newBoard);
+
+  if (winner === humanPlayer) {
+    return { score: -10 };
+  } else if (winner === aiPlayer) {
+    return { score: 10 };
+  } else if (winner === 'Draw') {
+    return { score: 0 };
+  }
+
+  const moves = [];
+  for (let i = 0; i < emptyCells.length; i++) {
+    const move = {};
+    move.index = emptyCells[i];
+    newBoard[emptyCells[i]] = player;
+
+    if (player === aiPlayer) {
+      const result = minimax(newBoard, humanPlayer);
+      move.score = result.score;
+    } else {
+      const result = minimax(newBoard, aiPlayer);
+      move.score = result.score;
+    }
+
+    newBoard[emptyCells[i]] = null;
+    moves.push(move);
+  }
+
+  let bestMove;
+  if (player === aiPlayer) {
+    let bestScore = -Infinity;
+    for (let i = 0; i < moves.length; i++) {
+      if (moves[i].score > bestScore) {
+        bestScore = moves[i].score;
+        bestMove = moves[i];
+      }
+    }
+  } else {
+    let bestScore = Infinity;
+    for (let i = 0; i < moves.length; i++) {
+      if (moves[i].score < bestScore) {
+        bestScore = moves[i].score;
+        bestMove = moves[i];
+      }
+    }
+  }
+
+  return bestMove;
+};
+
+// --- Theme Data ---
+const themes = {
+  cosmic: {
+    name: 'Cosmic',
+    bg: 'bg-gray-900',
+    text: 'text-white',
+    heading: 'from-indigo-400 to-purple-400',
+    buttons: 'bg-indigo-600',
+    cellBg: 'bg-gray-800',
+    statusText: 'text-indigo-200',
+    inputBg: 'bg-gray-700',
+    placeholder: 'placeholder-gray-400',
+    winnerLine: 'bg-orange-500'
+  },
+  ocean: {
+    name: 'Ocean',
+    bg: 'bg-blue-900',
+    text: 'text-white',
+    heading: 'from-cyan-400 to-blue-400',
+    buttons: 'bg-cyan-600',
+    cellBg: 'bg-blue-800',
+    statusText: 'text-cyan-200',
+    inputBg: 'bg-blue-700',
+    placeholder: 'placeholder-blue-400',
+    winnerLine: 'bg-yellow-500'
+  },
+  forest: {
+    name: 'Forest',
+    bg: 'bg-green-900',
+    text: 'text-white',
+    heading: 'from-lime-400 to-green-400',
+    buttons: 'bg-green-600',
+    cellBg: 'bg-green-800',
+    statusText: 'text-lime-200',
+    inputBg: 'bg-green-700',
+    placeholder: 'placeholder-green-400',
+    winnerLine: 'bg-red-500'
+  },
+};
+
+// --- Translations ---
+const translations = {
+  en: {
+    brandName: 'COSMIC',
+    gameName: 'Tic Tac Toe',
+    enterName: 'Enter your name to begin',
+    placeholderName: 'Enter your name',
+    proceed: 'Proceed',
+    hello: 'Hello',
+    easy: 'Easy',
+    medium: 'Medium',
+    hard: 'Hard',
+    restart: 'Restart',
+    mainMenu: 'Main Menu',
+    turn: "'s turn",
+    draw: "It's a Draw!",
+    congratulations: 'Congratulations!',
+    isWinner: 'is the winner!',
+    english: 'English',
+    hindi: 'Hindi'
+  },
+  hi: {
+    brandName: 'कॉस्मिक',
+    gameName: 'टिक-टैक-टो',
+    enterName: 'शुरू करने के लिए अपना नाम दर्ज करें',
+    placeholderName: 'अपना नाम लिखें',
+    proceed: 'आगे बढ़ें',
+    hello: 'नमस्ते',
+    easy: 'आसान',
+    medium: 'मध्यम',
+    hard: 'कठिन',
+    restart: 'पुनः शुरू करें',
+    mainMenu: 'मुख्य मेनू',
+    turn: " की बारी",
+    draw: "यह एक ड्रॉ है!",
+    congratulations: 'बधाई हो!',
+    isWinner: 'विजेता है!',
+    english: 'अंग्रेज़ी',
+    hindi: 'हिंदी'
+  }
+};
+
+const AnimatedRabbit = () => {
+  const [isLooking, setIsLooking] = useState(false);
+  const [direction, setDirection] = useState('left');
+
+  useEffect(() => {
+    const lookTimer = setInterval(() => {
+      setIsLooking(true);
+      setTimeout(() => {
+        setIsLooking(false);
+        setDirection(prev => prev === 'left' ? 'right' : 'left');
+      }, 500);
+    }, 3000); // Rabbit looks around every 3 seconds
+
+    return () => clearInterval(lookTimer);
+  }, []);
+
+  return (
+    <motion.div
+      className="text-4xl absolute -bottom-8 left-1/2 -translate-x-1/2 z-0"
+    >
+      <motion.div
+        animate={{ scaleX: direction === 'right' ? -1 : 1 }}
+        transition={{ duration: 0.5 }}
+      >
+        <motion.span
+          className="absolute text-5xl -top-12 -left-4"
+          initial={{ rotate: 0 }}
+          animate={isLooking ? (direction === 'left' ? { rotate: -15, y: -5 } : { rotate: 15, y: -5 }) : { rotate: 0, y: 0 }}
+          transition={{ duration: 0.3 }}
+        >
+          🐰
+        </motion.span>
+      </motion.div>
+    </motion.div>
+  );
+};
+
+
+// Main App Component
+const App = () => {
+  const initialBoard = Array(9).fill(null);
+  const [board, setBoard] = useState(initialBoard);
+  const [currentPlayer, setCurrentPlayer] = useState('X');
+  const [status, setStatus] = useState('Playing');
+  const [difficulty, setDifficulty] = useState(null);
+  const [winningLine, setWinningLine] = useState(null);
+  const [userName, setUserName] = useState('');
+  const [inputName, setInputName] = useState('');
+  const [currentTheme, setCurrentTheme] = useState('cosmic');
+  const [showCelebration, setShowCelebration] = useState(false);
+  const [language, setLanguage] = useState('en');
+  const isMobile = useIsMobile();
+
+  const theme = themes[currentTheme];
+  const t = translations[language];
+
+  // --- Game Logic ---
+  const checkWinner = useCallback((currentBoard) => {
+    const winningCombinations = [
+      [0, 1, 2], [3, 4, 5], [6, 7, 8],
+      [0, 3, 6], [1, 4, 7], [2, 5, 8],
+      [0, 4, 8], [2, 4, 6]
+    ];
+
+    for (const combo of winningCombinations) {
+      const [a, b, c] = combo;
+      if (currentBoard[a] && currentBoard[a] === currentBoard[b] && currentBoard[a] === currentBoard[c]) {
+        setWinningLine(combo);
+        return `${currentBoard[a]} wins`;
+      }
+    }
+
+    if (currentBoard.every(cell => cell !== null)) {
+      return 'Draw';
+    }
+
+    return 'Playing';
+  }, [setWinningLine]);
+
+  const handleCellClick = (index) => {
+    if (board[index] || status !== 'Playing' || currentPlayer !== 'X') {
+      return;
+    }
+
+    const newBoard = [...board];
+    newBoard[index] = currentPlayer;
+    const newStatus = checkWinner(newBoard);
+
+    setBoard(newBoard);
+    setStatus(newStatus);
+    if (newStatus === 'Playing') {
+      setCurrentPlayer('O');
+    }
+  };
+
+  const findWinningOrBlockingMove = useCallback((currentBoard, player) => {
+    const winningCombinations = [
+      [0, 1, 2], [3, 4, 5], [6, 7, 8],
+      [0, 3, 6], [1, 4, 7], [2, 5, 8],
+      [0, 4, 8], [2, 4, 6]
+    ];
+
+    for (const combo of winningCombinations) {
+      const [a, b, c] = combo;
+      const tempBoard = [...currentBoard];
+      if (tempBoard[a] === player && tempBoard[b] === player && tempBoard[c] === null) return c;
+      if (tempBoard[a] === player && tempBoard[c] === player && tempBoard[b] === null) return b;
+      if (tempBoard[b] === player && tempBoard[c] === player && tempBoard[a] === null) return a;
+    }
+    return null;
+  }, []);
+
+  const makeComputerMove = useCallback(() => {
+    const emptyCells = board.map((cell, index) => cell === null ? index : null).filter(val => val !== null);
+    const randomEmptyCell = emptyCells[Math.floor(Math.random() * emptyCells.length)];
+    let moveIndex = -1;
+
+    if (difficulty === 'easy') {
+      const winningMove = findWinningOrBlockingMove(board, 'O');
+      if (winningMove !== null && Math.random() > 0.5) {
+        moveIndex = winningMove;
+      } else {
+        moveIndex = randomEmptyCell;
+      }
+    } else if (difficulty === 'medium') {
+      const winningMove = findWinningOrBlockingMove(board, 'O');
+      if (winningMove !== null) {
+        moveIndex = winningMove;
+      } else {
+        const blockingMove = findWinningOrBlockingMove(board, 'X');
+        if (blockingMove !== null) {
+          moveIndex = blockingMove;
+        } else if (board[4] === null) {
+          moveIndex = 4;
+        } else {
+          const corners = [0, 2, 6, 8];
+          const availableCorners = corners.filter(i => board[i] === null);
+          if (availableCorners.length > 0) {
+            moveIndex = availableCorners[Math.floor(Math.random() * availableCorners.length)];
+          } else {
+            moveIndex = randomEmptyCell;
+          }
+        }
+      }
+    } else if (difficulty === 'hard') {
+      const bestMove = minimax(board, 'O');
+      moveIndex = bestMove.index;
+    }
+    
+    if (moveIndex !== -1) {
+      const newBoard = [...board];
+      newBoard[moveIndex] = 'O';
+      const newStatus = checkWinner(newBoard);
+
+      setBoard(newBoard);
+      setStatus(newStatus);
+      if (newStatus === 'Playing') {
+        setCurrentPlayer('X');
+      }
+    }
+  }, [board, difficulty, findWinningOrBlockingMove, checkWinner]);
+
+  // --- Computer AI Logic Trigger ---
+  useEffect(() => {
+    if (currentPlayer === 'O' && status === 'Playing') {
+      setTimeout(() => {
+        makeComputerMove();
+      }, 500);
+    }
+  }, [board, currentPlayer, status, difficulty, makeComputerMove]);
+  
+  // --- Celebration Trigger ---
+  useEffect(() => {
+    if (status === 'X wins' || status === 'O wins') {
+      const timer = setTimeout(() => {
+        setShowCelebration(true);
+      }, 2000); // 2 second delay for fire line animation
+      return () => clearTimeout(timer);
+    }
+  }, [status]);
+
+  const resetGame = (newDifficulty = difficulty) => {
+    setBoard(initialBoard);
+    setCurrentPlayer('X');
+    setStatus('Playing');
+    setDifficulty(newDifficulty);
+    setWinningLine(null);
+    setShowCelebration(false);
+  };
+
+  const returnToMenu = () => {
+    setBoard(initialBoard);
+    setDifficulty(null);
+    setCurrentPlayer('X');
+    setStatus('Playing');
+    setWinningLine(null);
+    setShowCelebration(false);
+  };
+
+  const handleNameSubmit = (e) => {
+    e.preventDefault();
+    if (inputName.trim() !== '') {
+      setUserName(inputName.trim());
+    }
+  };
+  
+  // Theme selection buttons
+  const ThemeSelector = () => (
+    <div className="flex justify-center space-x-2 my-4">
+      {Object.keys(themes).map(key => (
+        <button
+          key={key}
+          onClick={() => setCurrentTheme(key)}
+          className={`w-8 h-8 rounded-full border-2 transform transition-transform duration-200 ${theme.name.toLowerCase() === key ? 'scale-110 border-indigo-500' : 'border-gray-400 hover:scale-105'}`}
+          style={{ backgroundColor: themes[key].cellBg.split('-').slice(-1)[0] }}
+          aria-label={`${themes[key].name} theme`}
+        />
+      ))}
+    </div>
+  );
+
+  // --- UI Components ---
+  const RenderCell = ({ value, onClick, index }) => {
+    const isWinningCell = winningLine && winningLine.includes(index);
+    const cellClass = `w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 flex items-center justify-center rounded-xl cursor-pointer text-white text-5xl font-bold shadow-md transition-all duration-300 ${isWinningCell ? `${theme.winnerLine} animate-pulse-glow` : `${theme.cellBg} hover:scale-105`}`;
+
+    return (
+      <div onClick={onClick} className={cellClass}>
+        {value === 'X' && (
+          <div>
+            <X size={isMobile ? 64 : 80} strokeWidth={4} />
+          </div>
+        )}
+        {value === 'O' && (
+          <div>
+            <Circle size={isMobile ? 64 : 80} strokeWidth={4} />
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const Button = ({ children, onClick, className = '', type = 'button' }) => (
+    <button
+      type={type}
+      onClick={onClick}
+      className={`px-6 py-3 ${theme.buttons} ${theme.text} font-bold rounded-full shadow-lg transition-all duration-300 flex items-center justify-center space-x-2 ${className}`}
+    >
+      <span>{children}</span>
+    </button>
+  );
+
+  const StatusDisplay = () => {
+    let message = '';
+    if (status === 'Playing') {
+      message = `${currentPlayer === 'X' ? userName : 'Computer'}${t.turn}`;
+    } else if (status === 'Draw') {
+      message = t.draw;
+    } else {
+      return null;
+    }
+    return (
+      <div className={`text-center font-extrabold text-4xl mb-6 ${theme.statusText}`}>
+        <span>{message}</span>
+      </div>
+    );
+  };
+
+  const Celebration = () => {
+    const winnerName = status === 'X wins' ? userName : 'Computer';
+    
+    // Animation variants for falling objects
+    const fallingVariants = {
+      hidden: { y: -100, opacity: 0, scale: 0.5 },
+      visible: i => ({
+        y: 1000,
+        opacity: [0, 1, 1, 0],
+        scale: [0.5, 1.2, 1],
+        transition: {
+          delay: i * 0.1,
+          duration: 4 + Math.random() * 2,
+          ease: "linear",
+          repeat: Infinity,
+          repeatDelay: 0
+        },
+      }),
+    };
+    
+    const celebrationTextVariants = {
+      hidden: { opacity: 0, y: 50, scale: 0.8 },
+      visible: {
+        opacity: 1,
+        y: 0,
+        scale: 1,
+        transition: {
+          delay: 0.5,
+          type: "spring",
+          stiffness: 120,
+          damping: 10,
+          mass: 0.5
+        }
+      }
+    };
+
+    const buttonVariants = {
+      hidden: { opacity: 0, y: 20 },
+      visible: {
+        opacity: 1,
+        y: 0,
+        transition: {
+          delay: 2.5
+        }
+      }
+    };
+    
+    const confettiColors = ['#F9A825', '#EF5350', '#66BB6A', '#29B6F6', '#9575CD'];
+    const emojis = ['🎉', '🎊', '✨', ' ', '🌼', '💫'];
+
+    return (
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.5 }}
+        className="fixed inset-0 z-50 flex flex-col items-center justify-center p-4"
+        style={{ background: 'rgba(0,0,0,0.7)' }}
+      >
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          {[...Array(50)].map((_, i) => (
+            <motion.div
+              key={i}
+              custom={i}
+              variants={fallingVariants}
+              initial="hidden"
+              animate="visible"
+              className="text-2xl absolute"
+              style={{
+                top: `${Math.random() * -20}%`,
+                left: `${Math.random() * 100}%`,
+                color: confettiColors[i % confettiColors.length],
+                transform: `rotate(${Math.random() * 360}deg)`
+              }}
+            >
+              {emojis[i % emojis.length]}
+            </motion.div>
+          ))}
+        </div>
+
+        <motion.div
+          variants={celebrationTextVariants}
+          initial="hidden"
+          animate="visible"
+          className="text-center z-10 p-8 rounded-xl"
+        >
+          <h2 className={`text-4xl sm:text-5xl md:text-6xl font-extrabold ${theme.heading} bg-clip-text text-transparent`}>
+            {t.congratulations}
+          </h2>
+          <p className={`text-xl sm:text-2xl md:text-3xl font-bold mt-2 ${theme.text}`}>
+            {`${winnerName} ${t.isWinner}`}
+          </p>
+        </motion.div>
+
+        <motion.div
+          variants={buttonVariants}
+          initial="hidden"
+          animate="visible"
+          className="mt-8 z-10"
+        >
+          <Button onClick={returnToMenu} className={theme.buttons}>
+            {t.mainMenu}
+          </Button>
+        </motion.div>
+      </motion.div>
+    );
+  };
+  
+  // --- Main Render Logic ---
+  return (
+    <>
+    <style>
+      {`
+        @import url('https://fonts.googleapis.com/css2?family=Pacifico&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap');
+        .font-pacifico {
+          font-family: 'Pacifico', cursive;
+        }
+        .font-bebas-neue {
+          font-family: 'Bebas Neue', sans-serif;
+        }
+        @keyframes ear-wiggle {
+          0%, 100% { transform: rotate(0deg); }
+          50% { transform: rotate(-15deg); }
+        }
+        .ear-wiggle-left { animation: ear-wiggle 1s ease-in-out infinite; }
+        .ear-wiggle-right { animation: ear-wiggle 1s ease-in-out infinite; }
+      `}
+    </style>
+    <div className={`min-h-screen ${theme.bg} ${theme.text} flex flex-col items-center justify-center font-sans p-4 relative`}>
+      <div className="absolute top-4 right-4 flex space-x-2 z-10">
+        <button 
+          onClick={() => setLanguage('en')}
+          className={`font-bold px-3 py-1 rounded-full transition-colors duration-200 ${language === 'en' ? 'bg-indigo-600 text-white' : 'bg-gray-700 text-gray-300'}`}
+        >
+          {t.english}
+        </button>
+        <button 
+          onClick={() => setLanguage('hi')}
+          className={`font-bold px-3 py-1 rounded-full transition-colors duration-200 ${language === 'hi' ? 'bg-indigo-600 text-white' : 'bg-gray-700 text-gray-300'}`}
+        >
+          {t.hindi}
+        </button>
+      </div>
+      <h1 className={`text-center mb-10 relative z-10`}>
+        <span className={`block text-6xl sm:text-7xl font-extrabold bg-clip-text bg-gradient-to-r ${theme.heading} text-transparent font-bebas-neue tracking-widest leading-none relative`}>
+          {t.brandName}
+        </span>
+        <AnimatedRabbit />
+        <span className={`block text-3xl sm:text-4xl font-bold text-white leading-none mt-2 font-pacifico`}>
+          {t.gameName}
+        </span>
+      </h1>
+      
+      {/* Name input screen */}
+      {userName === '' ? (
+        <div className="flex flex-col space-y-4 w-full max-w-xs text-center z-10">
+          <h2 className={`text-3xl font-pacifico mb-4 ${theme.text}`}>
+            {t.enterName}
+          </h2>
+          <form onSubmit={handleNameSubmit} className="flex flex-col space-y-4">
+            <input
+              type="text"
+              value={inputName}
+              onChange={(e) => setInputName(e.target.value)}
+              placeholder={t.placeholderName}
+              className={`w-full px-4 py-2 rounded-lg ${theme.inputBg} ${theme.text} ${theme.placeholder} focus:outline-none focus:ring-2 focus:ring-indigo-500`}
+            />
+            <Button type="submit" className={theme.buttons}>
+              {t.proceed}
+            </Button>
+          </form>
+        </div>
+      ) : difficulty === null ? (
+        <div className="flex flex-col space-y-4 w-full max-w-xs z-10">
+          <h2 className={`text-2xl font-bold text-center ${theme.statusText}`}>{t.hello}, {userName}!</h2>
+          <ThemeSelector />
+          <Button onClick={() => resetGame('easy')} className="bg-green-600">
+            {t.easy}
+          </Button>
+          <Button onClick={() => resetGame('medium')} className="bg-yellow-600">
+            {t.medium}
+          </Button>
+          <Button onClick={() => resetGame('hard')} className="bg-red-600">
+            {t.hard}
+          </Button>
+        </div>
+      ) : (
+        <div className="flex flex-col items-center z-10">
+          <StatusDisplay />
+          <div className="grid grid-cols-3 gap-4 mb-8">
+            {board.map((cell, index) => (
+              <RenderCell
+                key={index}
+                index={index}
+                value={cell}
+                onClick={() => handleCellClick(index)}
+              />
+            ))}
+          </div>
+
+          <div className="flex space-x-4">
+            <Button onClick={() => resetGame()} className={theme.buttons}>
+              <RefreshCcw size={24} />
+              <span>{t.restart}</span>
+            </Button>
+            <Button onClick={returnToMenu} className={`${theme.buttons} bg-gray-600`}>
+              {t.mainMenu}
+            </Button>
+          </div>
+        </div>
+      )}
+      <AnimatePresence>
+        {showCelebration && <Celebration />}
+      </AnimatePresence>
+    </div>
+    </>
+  );
+};
+
+export default App;
+ 
